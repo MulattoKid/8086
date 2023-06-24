@@ -29,7 +29,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 int main(int argc, char** argv)
 {
-    // Get file to process
+    /* Get file to process */
     if (argc != 2)
     {
         printf("[ARGS] Invalid number of arguments (%i)\n", argc);
@@ -37,7 +37,7 @@ int main(int argc, char** argv)
     }
     const char* file_name = argv[1];
 
-    // Read file
+    /* Read file */
     FILE* file = fopen(file_name, "rb");
     if (file == NULL)
     {
@@ -51,7 +51,7 @@ int main(int argc, char** argv)
     fread(file_data, file_size, 1, file);
     fclose(file);
 
-    // Decode instructions
+    /* Decode instructions */
     inst_decode(file_data, file_size);
 
     return 0;
