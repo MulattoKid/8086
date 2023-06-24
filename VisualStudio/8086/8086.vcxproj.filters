@@ -1,0 +1,19 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="instruction_decoder">
+      <UniqueIdentifier>{67f4e2e8-e888-4727-a0d9-21246dc21fcb}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\main.c" />
+    <ClCompile Include="..\..\instruction_decoder\decoder.c">
+      <Filter>instruction_decoder</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\instruction_decoder\decoder.h">
+      <Filter>instruction_decoder</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>
