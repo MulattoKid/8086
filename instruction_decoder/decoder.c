@@ -26,6 +26,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <stdio.h>
 
 #define REGISTER_COUNT (uint8_t)8U
+#define ADDRESS_CALC_COUNT (uint8_t)8U
 
 typedef enum
 {
@@ -33,27 +34,122 @@ typedef enum
     OPCODE_MOV_IMM = 0b10110000,
 } opcode_t;
 
-static const char* register_names[] = {
+static const char* reg_to_register_name[2][REGISTER_COUNT] = {
     /* W=0 */
-    "al",
-    "cl",
-    "dl",
-    "bl",
-    "ah",
-    "ch",
-    "dh",
-    "bh",
-
+    {
+        "al",
+        "cl",
+        "dl",
+        "bl",
+        "ah",
+        "ch",
+        "dh",
+        "bh",
+    },
     /* W=1 */
-    "ax",
-    "cx",
-    "dx",
-    "bx",
-    "sp",
-    "bp",
-    "si",
-    "di"
+    {
+        "ax",
+        "cx",
+        "dx",
+        "bx",
+        "sp",
+        "bp",
+        "si",
+        "di"
+    }
 };
+
+static const char* r_m_to_addr_calc_name[3][ADDRESS_CALC_COUNT] = {
+    /* MOD=00 */
+    {
+        "bx + si",
+        "bx + di",
+        "bp + si",
+        "bp + di",
+        "si",
+        "di",
+        "direct address",
+        "bx"
+    },
+    /* MOD=01 */
+    {
+        "bx + si + ",
+        "bx + di + ",
+        "bp + si + ",
+        "bp + di + ",
+        "si + ",
+        "di + ",
+        "bp + ",
+        "bx + "
+    },
+    /* MOD=10 */
+    {
+        "bx + si + ",
+        "bx + di + ",
+        "bp + si + ",
+        "bp + di + ",
+        "si + ",
+        "di + ",
+        "bp + ",
+        "bx + "
+    }
+};
+
+static void mov_mod_00(const uint8_t* const inst_stream, const uint32_t inst_stream_len, uint32_t* const inst_stream_index, const uint8_t d, const uint8_t w, const uint8_t reg, const uint8_t r_m)
+{
+    /* Handle direct address in displacement */
+    if (r_m == 0b110)
+    {
+        /* Get 16-bit displacement */
+        uint16_t addr = inst_stream[*inst_stream_index];
+        (*inst_stream_index)++;
+        addr |= (uint16_t)inst_stream[*inst_stream_index] << 8;
+        (*inst_stream_index)++;
+
+        /* Print decoded instruction */
+        printf("mov %s, [0x%04X]\n", reg_to_register_name[w][reg], addr);
+
+        return;
+    }
+    
+    /* Determine what's source and destination */
+    if (d == 0)
+    {
+        const char* src_name = reg_to_register_name[w][reg];
+        const char* dst_name = r_m_to_addr_calc_name[0b00][r_m];
+
+        /* Print decoded instruction */
+        printf("mov %s, [%s]\n", dst_name, src_name);
+    }
+    else /* d == 1 */
+    {
+        const char* src_name = r_m_to_addr_calc_name[0b00][r_m];
+        const char* dst_name = reg_to_register_name[w][reg];
+
+        /* Print decoded instruction */
+        printf("mov %s, [%s]\n", dst_name, src_name);
+    }
+}
+
+static void mov_mod_11(const uint8_t* const inst_stream, const uint32_t inst_stream_len, uint32_t* const inst_stream_index, const uint8_t d, const uint8_t w, const uint8_t reg, const uint8_t r_m)
+{
+    /* Determine what's source and destination */
+    uint8_t src_index;
+    uint8_t dst_index;
+    if (d == 0)
+    {
+        src_index = reg;
+        dst_index = r_m;
+    }
+    else /* d == 1 */
+    {
+        src_index = r_m;
+        dst_index = reg;
+    }
+
+    /* Print decoded instruction */
+    printf("mov %s, %s\n", reg_to_register_name[w][dst_index], reg_to_register_name[w][src_index]);
+}
 
 static void decode_mov(const uint8_t* const inst_stream, const uint32_t inst_stream_len, uint32_t* const inst_stream_index)
 {
@@ -67,32 +163,34 @@ static void decode_mov(const uint8_t* const inst_stream, const uint32_t inst_str
     (*inst_stream_index)++;
 
     /* Check fields */
-    if (mod != 0b11)
+    switch (mod)
     {
-        printf("[DECODE MOD] Unsupported MOD field (0x%02X)\n", mod);
-        return;
+        case 0b00:
+        {
+            mov_mod_00(inst_stream, inst_stream_len, inst_stream_index, d, w, reg, r_m);
+            break;
+        }
+        case 0b01:
+        {
+            return;
+            break;
+        }
+        case 0b10:
+        {
+            return;
+            break;
+        }
+        case 0b11:
+        {
+            mov_mod_11(inst_stream, inst_stream_len, inst_stream_index, d, w, reg, r_m);
+            break;
+        }
+        default:
+        {
+            printf("[DECODE MOD] Unsupported MOD field (0x%02X)\n", mod);
+            return;
+        }
     }
-
-    /* Map REG and R/M to register names */
-    const uint8_t reg_index = (REGISTER_COUNT * w) + reg;
-    const uint8_t r_m_index = (REGISTER_COUNT * w) + r_m;
-
-    /* Determine what is source and destination */
-    uint8_t src_index;
-    uint8_t dst_index;
-    if (d == 0)
-    {
-        src_index = reg_index;
-        dst_index = r_m_index;
-    }
-    else /* d == 1 */
-    {
-        src_index = r_m_index;
-        dst_index = reg_index;
-    }
-
-    /* Print decoded instruction */
-    printf("mov %s, %s\n", register_names[dst_index], register_names[src_index]);
 }
 
 static void decode_mov_imm(const uint8_t* const inst_stream, const uint32_t inst_stream_len, uint32_t* const inst_stream_index)
@@ -112,11 +210,8 @@ static void decode_mov_imm(const uint8_t* const inst_stream, const uint32_t inst
         (*inst_stream_index)++;
     }
 
-    /* Map REG to register name */
-    const uint8_t reg_index = (REGISTER_COUNT * w) + reg;
-
     /* Print decoded instruction */
-    printf("mov %s, %u\n", register_names[reg_index], ((uint16_t)data_high << 8) | (uint16_t)data_low);
+    printf("mov %s, %u\n", reg_to_register_name[w][reg], ((uint16_t)data_high << 8) | (uint16_t)data_low);
 }
 
 /**
