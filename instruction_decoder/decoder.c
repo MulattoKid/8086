@@ -29,7 +29,8 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 typedef enum
 {
-    OPCODE_MOV = 0b10001000,
+    OPCODE_MOV     = 0b10001000,
+    OPCODE_MOV_IMM = 0b10110000,
 } opcode_t;
 
 static const char* register_names[] = {
@@ -56,7 +57,7 @@ static const char* register_names[] = {
 
 static void decode_mov(const uint8_t* const inst_stream, const uint32_t inst_stream_len, uint32_t* const inst_stream_index)
 {
-    // Get fields
+    /* Get fields */
     const uint8_t d = (inst_stream[*inst_stream_index] & 0b10) >> 1;
     const uint8_t w = inst_stream[*inst_stream_index] & 0b1;
     (*inst_stream_index)++;
@@ -92,6 +93,30 @@ static void decode_mov(const uint8_t* const inst_stream, const uint32_t inst_str
 
     /* Print decoded instruction */
     printf("mov %s, %s\n", register_names[dst_index], register_names[src_index]);
+}
+
+static void decode_mov_imm(const uint8_t* const inst_stream, const uint32_t inst_stream_len, uint32_t* const inst_stream_index)
+{
+    /* Get fields */
+    const uint8_t w = (inst_stream[*inst_stream_index] & 0b1000) >> 3;
+    const uint8_t reg = inst_stream[*inst_stream_index] & 0b111;
+    (*inst_stream_index)++;
+
+    /* Get data */
+    const uint8_t data_low = inst_stream[*inst_stream_index];
+    (*inst_stream_index)++;
+    uint8_t data_high = 0x00;
+    if (w == 1)
+    {
+        data_high = inst_stream[*inst_stream_index];
+        (*inst_stream_index)++;
+    }
+
+    /* Map REG to register name */
+    const uint8_t reg_index = (REGISTER_COUNT * w) + reg;
+
+    /* Print decoded instruction */
+    printf("mov %s, %u\n", register_names[reg_index], ((uint16_t)data_high << 8) | (uint16_t)data_low);
 }
 
 /**
@@ -143,21 +168,20 @@ void inst_decode(const uint8_t* const inst_stream, const uint32_t inst_stream_le
     uint32_t index = 0;
     while (index < inst_stream_len)
     {
-        /* Extract 6 MSbs */
+        /* Determine OPCODE */
         const opcode_t opcode = inst_stream[index] & 0xFC;
-        switch (opcode)
+        if ((opcode & 0b11111100) == OPCODE_MOV)
         {
-            case OPCODE_MOV:
-            {
-                decode_mov(inst_stream, inst_stream_len, &index);
-                break;
-            }
-            
-            default:
-            {
-                printf("[DECODE] Unknown opcode (0x%02X)\n", opcode);
-                break;
-            }
+            decode_mov(inst_stream, inst_stream_len, &index);
+        }
+        else if ((opcode & 0b11110000) == OPCODE_MOV_IMM)
+        {
+            decode_mov_imm(inst_stream, inst_stream_len, &index);
+        }
+        else
+        {
+            printf("[DECODE] Unknown opcode (0x%02X)\n", opcode);
+            return;
         }
     }
 }
