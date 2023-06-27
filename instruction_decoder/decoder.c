@@ -30,8 +30,9 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 typedef enum
 {
-    OPCODE_MOV     = 0b10001000,
-    OPCODE_MOV_IMM = 0b10110000,
+    OPCODE_MOV                   = 0b10001000,
+    OPCODE_MOV_IMM_TO_REG_OR_MEM = 0b11000110,
+    OPCODE_MOV_IMM_TO_REG        = 0b10110000,
 } opcode_t;
 
 static const char* reg_to_register_name[2][REGISTER_COUNT] = {
@@ -223,7 +224,67 @@ static void decode_mov(const uint8_t* const inst_stream, const uint32_t inst_str
     }
 }
 
-static void decode_mov_imm(const uint8_t* const inst_stream, const uint32_t inst_stream_len, uint32_t* const inst_stream_index)
+static void decode_mov_imm_to_reg_or_mem(const uint8_t* const inst_stream, const uint32_t inst_stream_len, uint32_t* const inst_stream_index)
+{
+    /* Get fields */
+    const uint8_t w = inst_stream[*inst_stream_index] & 0b1;
+    (*inst_stream_index)++;
+    const uint8_t mod = (inst_stream[*inst_stream_index] & 0b11000000) >> 6;
+    const uint8_t r_m = inst_stream[*inst_stream_index] & 0b111;
+    (*inst_stream_index)++;
+
+    /* Get address */
+    uint16_t address = 0;
+    if (mod != 0b00)
+    {
+        address = (uint16_t)inst_stream[*inst_stream_index];
+        (*inst_stream_index)++;
+    }
+    if (mod == 0b10)
+    {
+        address |= ((uint16_t)inst_stream[*inst_stream_index]) << 8;
+        (*inst_stream_index)++;
+    }
+
+    /* Get immediate value */
+    uint16_t imm = (uint16_t)inst_stream[*inst_stream_index];
+    (*inst_stream_index)++;
+    if (w == 1)
+    {
+        imm |= ((uint16_t)inst_stream[*inst_stream_index]) << 8;
+        (*inst_stream_index)++;
+    }
+
+    /* Determine what's source and destination */
+    const uint16_t src_name = imm;
+    const char* dst_name = r_m_to_addr_calc_name[r_m];
+
+    /* Print decoded instruction */
+    if (address == 0x00)
+    {
+        if (w == 0)
+        {
+            printf("mov [%s], byte %u\n", dst_name, src_name);
+        }
+        else /* w == 1*/
+        {
+            printf("mov [%s], word %u\n", dst_name, src_name);
+        }
+    }
+    else
+    {
+        if (w == 0)
+        {
+            printf("mov [%s + %u], byte %u\n", dst_name, address, src_name);
+        }
+        else /* w == 1*/
+        {
+            printf("mov [%s + %u], word %u\n", dst_name, address, src_name);
+        }
+    }
+}
+
+static void decode_mov_imm_to_reg(const uint8_t* const inst_stream, const uint32_t inst_stream_len, uint32_t* const inst_stream_index)
 {
     /* Get fields */
     const uint8_t w = (inst_stream[*inst_stream_index] & 0b1000) >> 3;
@@ -294,14 +355,18 @@ void inst_decode(const uint8_t* const inst_stream, const uint32_t inst_stream_le
     while (index < inst_stream_len)
     {
         /* Determine OPCODE */
-        const opcode_t opcode = inst_stream[index] & 0xFC;
+        const opcode_t opcode = inst_stream[index];
         if ((opcode & 0b11111100) == OPCODE_MOV)
         {
             decode_mov(inst_stream, inst_stream_len, &index);
         }
-        else if ((opcode & 0b11110000) == OPCODE_MOV_IMM)
+        else if ((opcode & 0b11111110) == OPCODE_MOV_IMM_TO_REG_OR_MEM)
         {
-            decode_mov_imm(inst_stream, inst_stream_len, &index);
+            decode_mov_imm_to_reg_or_mem(inst_stream, inst_stream_len, &index);
+        }
+        else if ((opcode & 0b11110000) == OPCODE_MOV_IMM_TO_REG)
+        {
+            decode_mov_imm_to_reg(inst_stream, inst_stream_len, &index);
         }
         else
         {
