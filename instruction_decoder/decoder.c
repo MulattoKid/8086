@@ -33,6 +33,8 @@ typedef enum
     OPCODE_MOV                   = 0b10001000,
     OPCODE_MOV_IMM_TO_REG_OR_MEM = 0b11000110,
     OPCODE_MOV_IMM_TO_REG        = 0b10110000,
+    OPCODE_MOV_MEM_TO_ACC        = 0b10100000,
+    OPCODE_MOV_ACC_TO_MEM        = 0b10100010,
 } opcode_t;
 
 static const char* reg_to_register_name[2][REGISTER_COUNT] = {
@@ -305,6 +307,44 @@ static void decode_mov_imm_to_reg(const uint8_t* const inst_stream, const uint32
     printf("mov %s, %u\n", reg_to_register_name[w][reg], ((uint16_t)data_high << 8) | (uint16_t)data_low);
 }
 
+static void decode_mov_mem_to_acc(const uint8_t* const inst_stream, const uint32_t inst_stream_len, uint32_t* const inst_stream_index)
+{
+    /* Get fields */
+    const uint8_t w = inst_stream[*inst_stream_index] & 0b1;
+    (*inst_stream_index)++;
+
+    /* Get address */
+    uint16_t address = (uint16_t)inst_stream[*inst_stream_index];
+    (*inst_stream_index)++;
+    if (w == 1)
+    {
+        address |= ((uint16_t)inst_stream[*inst_stream_index]) << 8;
+        (*inst_stream_index)++;
+    }
+
+    /* Print decoded instruction */
+    printf("mov ax, [0x%04X]\n", address);
+}
+
+static void decode_mov_acc_to_mem(const uint8_t* const inst_stream, const uint32_t inst_stream_len, uint32_t* const inst_stream_index)
+{
+    /* Get fields */
+    const uint8_t w = inst_stream[*inst_stream_index] & 0b1;
+    (*inst_stream_index)++;
+
+    /* Get address */
+    uint16_t address = (uint16_t)inst_stream[*inst_stream_index];
+    (*inst_stream_index)++;
+    if (w == 1)
+    {
+        address |= ((uint16_t)inst_stream[*inst_stream_index]) << 8;
+        (*inst_stream_index)++;
+    }
+
+    /* Print decoded instruction */
+    printf("mov [0x%04X], ax\n", address);
+}
+
 /**
  * See page 4-18 in the manual.
  * 
@@ -367,6 +407,14 @@ void inst_decode(const uint8_t* const inst_stream, const uint32_t inst_stream_le
         else if ((opcode & 0b11110000) == OPCODE_MOV_IMM_TO_REG)
         {
             decode_mov_imm_to_reg(inst_stream, inst_stream_len, &index);
+        }
+        else if ((opcode & 0b11111110) == OPCODE_MOV_MEM_TO_ACC)
+        {
+            decode_mov_mem_to_acc(inst_stream, inst_stream_len, &index);
+        }
+        else if ((opcode & 0b11111110) == OPCODE_MOV_ACC_TO_MEM)
+        {
+            decode_mov_acc_to_mem(inst_stream, inst_stream_len, &index);
         }
         else
         {
