@@ -59,40 +59,15 @@ static const char* reg_to_register_name[2][REGISTER_COUNT] = {
     }
 };
 
-static const char* r_m_to_addr_calc_name[3][ADDRESS_CALC_COUNT] = {
-    /* MOD=00 */
-    {
-        "bx + si",
-        "bx + di",
-        "bp + si",
-        "bp + di",
-        "si",
-        "di",
-        "direct address",
-        "bx"
-    },
-    /* MOD=01 */
-    {
-        "bx + si + ",
-        "bx + di + ",
-        "bp + si + ",
-        "bp + di + ",
-        "si + ",
-        "di + ",
-        "bp + ",
-        "bx + "
-    },
-    /* MOD=10 */
-    {
-        "bx + si + ",
-        "bx + di + ",
-        "bp + si + ",
-        "bp + di + ",
-        "si + ",
-        "di + ",
-        "bp + ",
-        "bx + "
-    }
+static const char* r_m_to_addr_calc_name[ADDRESS_CALC_COUNT] = {
+    "bx + si",
+    "bx + di",
+    "bp + si",
+    "bp + di",
+    "si",
+    "di",
+    "bp",
+    "bx"
 };
 
 static void mov_mod_00(const uint8_t* const inst_stream, const uint32_t inst_stream_len, uint32_t* const inst_stream_index, const uint8_t d, const uint8_t w, const uint8_t reg, const uint8_t r_m)
@@ -106,8 +81,23 @@ static void mov_mod_00(const uint8_t* const inst_stream, const uint32_t inst_str
         addr |= (uint16_t)inst_stream[*inst_stream_index] << 8;
         (*inst_stream_index)++;
 
-        /* Print decoded instruction */
-        printf("mov %s, [0x%04X]\n", reg_to_register_name[w][reg], addr);
+        /* Determine what's source and destination */
+        if (d == 0)
+        {
+            const char* src_name = reg_to_register_name[w][reg];
+            const uint16_t dst_name = addr;
+
+            /* Print decoded instruction */
+            printf("mov [0x%04X], %s\n", dst_name, src_name);
+        }
+        else /* d == 1 */
+        {
+            const uint16_t src_name = addr;
+            const char* dst_name = reg_to_register_name[w][reg];
+
+            /* Print decoded instruction */
+            printf("mov %s, [0x%04X]\n", dst_name, src_name);
+        }
 
         return;
     }
@@ -116,18 +106,62 @@ static void mov_mod_00(const uint8_t* const inst_stream, const uint32_t inst_str
     if (d == 0)
     {
         const char* src_name = reg_to_register_name[w][reg];
-        const char* dst_name = r_m_to_addr_calc_name[0b00][r_m];
+        const char* dst_name = r_m_to_addr_calc_name[r_m];
 
         /* Print decoded instruction */
-        printf("mov %s, [%s]\n", dst_name, src_name);
+        printf("mov [%s], %s\n", dst_name, src_name);
     }
     else /* d == 1 */
     {
-        const char* src_name = r_m_to_addr_calc_name[0b00][r_m];
+        const char* src_name = r_m_to_addr_calc_name[r_m];
         const char* dst_name = reg_to_register_name[w][reg];
 
         /* Print decoded instruction */
         printf("mov %s, [%s]\n", dst_name, src_name);
+    }
+}
+
+static void mov_mod_01_10(const uint8_t* const inst_stream, const uint32_t inst_stream_len, uint32_t* const inst_stream_index, const uint8_t d, const uint8_t w, const uint8_t reg, const uint8_t r_m, const uint8_t mod)
+{
+    /* Get address */
+    uint16_t address = (uint16_t)inst_stream[*inst_stream_index];
+    (*inst_stream_index)++;
+    if (mod == 0b10)
+    {
+        address |= ((uint16_t)inst_stream[*inst_stream_index]) << 8;
+        (*inst_stream_index)++;
+    }
+
+    /* Determine what's source and destination */
+    if (d == 0)
+    {
+        const char* src_name = reg_to_register_name[w][reg];
+        const char* dst_name = r_m_to_addr_calc_name[r_m];
+
+        /* Print decoded instruction */
+        if (address == 0x00)
+        {
+            printf("mov [%s], %s\n", dst_name, src_name);
+        }
+        else
+        {
+            printf("mov [%s + %u], %s\n", dst_name, address, src_name);
+        }
+    }
+    else /* d == 1 */
+    {
+        const char* src_name = r_m_to_addr_calc_name[r_m];
+        const char* dst_name = reg_to_register_name[w][reg];
+        
+        /* Print decoded instruction */
+        if (address == 0x00)
+        {
+            printf("mov %s, [%s]\n", dst_name, src_name);
+        }
+        else
+        {
+            printf("mov %s, [%s + %u]\n", dst_name, src_name, address);
+        }
     }
 }
 
@@ -171,13 +205,9 @@ static void decode_mov(const uint8_t* const inst_stream, const uint32_t inst_str
             break;
         }
         case 0b01:
-        {
-            return;
-            break;
-        }
         case 0b10:
         {
-            return;
+            mov_mod_01_10(inst_stream, inst_stream_len, inst_stream_index, d, w, reg, r_m, mod);
             break;
         }
         case 0b11:
