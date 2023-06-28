@@ -21,14 +21,6 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-#ifndef DECODER_H
-#define DECODER_H
+#include "decoder_mov.h"
 
-#include <stdint.h>
-#include <stdio.h>
 
-void decoder_decode_stream(const uint8_t* const inst_stream, const uint32_t inst_stream_len, FILE* output_file);
-const char* decoder_get_reg_name_from_reg(const uint8_t w, const uint8_t reg);
-const char* decoder_get_effective_address_from_rm(const uint8_t rm);
-
-#endif

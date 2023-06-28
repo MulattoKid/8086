@@ -23,6 +23,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "decoder.h"
 
+#include <stdbool.h>
 #include <stdio.h>
 
 #define REGISTER_COUNT (uint8_t)8U
@@ -37,7 +38,7 @@ typedef enum
     OPCODE_MOV_ACC_TO_MEM        = 0b10100010,
 } opcode_t;
 
-static const char* reg_to_register_name[2][REGISTER_COUNT] = {
+static const char* reg_to_reg_name[2][REGISTER_COUNT] = {
     /* W=0 */
     {
         "al",
@@ -73,7 +74,8 @@ static const char* r_m_to_addr_calc_name[ADDRESS_CALC_COUNT] = {
     "bx"
 };
 
-static void mov_mod_00(const uint8_t* const inst_stream, const uint32_t inst_stream_len, uint32_t* const inst_stream_index, const uint8_t d, const uint8_t w, const uint8_t reg, const uint8_t r_m)
+
+static void mov_mod_00(const uint8_t* const inst_stream, const uint32_t inst_stream_len, uint32_t* const inst_stream_index, const uint8_t d, const uint8_t w, const uint8_t reg, const uint8_t r_m, FILE* file)
 {
     /* Handle direct address in displacement */
     if (r_m == 0b110)
@@ -87,19 +89,19 @@ static void mov_mod_00(const uint8_t* const inst_stream, const uint32_t inst_str
         /* Determine what's source and destination */
         if (d == 0)
         {
-            const char* src_name = reg_to_register_name[w][reg];
+            const char* src_name = decoder_get_reg_name_from_reg(w, reg);
             const uint16_t dst_name = addr;
 
             /* Print decoded instruction */
-            printf("mov [0x%04X], %s\n", dst_name, src_name);
+            fprintf(file, "mov [0x%04X], %s\n", dst_name, src_name);
         }
         else /* d == 1 */
         {
             const uint16_t src_name = addr;
-            const char* dst_name = reg_to_register_name[w][reg];
+            const char* dst_name = decoder_get_reg_name_from_reg(w, reg);
 
             /* Print decoded instruction */
-            printf("mov %s, [0x%04X]\n", dst_name, src_name);
+            fprintf(file, "mov %s, [0x%04X]\n", dst_name, src_name);
         }
 
         return;
@@ -108,25 +110,26 @@ static void mov_mod_00(const uint8_t* const inst_stream, const uint32_t inst_str
     /* Determine what's source and destination */
     if (d == 0)
     {
-        const char* src_name = reg_to_register_name[w][reg];
-        const char* dst_name = r_m_to_addr_calc_name[r_m];
+        const char* src_name = decoder_get_reg_name_from_reg(w, reg);
+        const char* dst_name = decoder_get_effective_address_from_rm(r_m);
 
         /* Print decoded instruction */
-        printf("mov [%s], %s\n", dst_name, src_name);
+        fprintf(file, "mov [%s], %s\n", dst_name, src_name);
     }
     else /* d == 1 */
     {
-        const char* src_name = r_m_to_addr_calc_name[r_m];
-        const char* dst_name = reg_to_register_name[w][reg];
+        const char* src_name = decoder_get_effective_address_from_rm(r_m);
+        const char* dst_name = decoder_get_reg_name_from_reg(w, reg);
 
         /* Print decoded instruction */
-        printf("mov %s, [%s]\n", dst_name, src_name);
+        fprintf(file, "mov %s, [%s]\n", dst_name, src_name);
     }
 }
 
-static void mov_mod_01_10(const uint8_t* const inst_stream, const uint32_t inst_stream_len, uint32_t* const inst_stream_index, const uint8_t d, const uint8_t w, const uint8_t reg, const uint8_t r_m, const uint8_t mod)
+static void mov_mod_01_10(const uint8_t* const inst_stream, const uint32_t inst_stream_len, uint32_t* const inst_stream_index, const uint8_t d, const uint8_t w, const uint8_t reg, const uint8_t r_m, const uint8_t mod, FILE* file)
 {
     /* Get address */
+    bool address_is_negative = false;
     uint16_t address = (uint16_t)inst_stream[*inst_stream_index];
     (*inst_stream_index)++;
     if (mod == 0b10)
@@ -134,41 +137,64 @@ static void mov_mod_01_10(const uint8_t* const inst_stream, const uint32_t inst_
         address |= ((uint16_t)inst_stream[*inst_stream_index]) << 8;
         (*inst_stream_index)++;
     }
+    else /* mod == 0b01 */
+    {
+        /* Check if address is negative, and if so sign-extend it to 16 bits*/
+        if ((address & 0x80) == 0x80)
+        {
+            address |= 0xFF00;
+            address_is_negative = true;
+        }
+    }
 
     /* Determine what's source and destination */
     if (d == 0)
     {
-        const char* src_name = reg_to_register_name[w][reg];
-        const char* dst_name = r_m_to_addr_calc_name[r_m];
+        const char* src_name = decoder_get_reg_name_from_reg(w, reg);
+        const char* dst_name = decoder_get_effective_address_from_rm(r_m);
 
         /* Print decoded instruction */
         if (address == 0x00)
         {
-            printf("mov [%s], %s\n", dst_name, src_name);
+            fprintf(file, "mov [%s], %s\n", dst_name, src_name);
         }
         else
         {
-            printf("mov [%s + %u], %s\n", dst_name, address, src_name);
+            if (address_is_negative == false)
+            {
+                fprintf(file, "mov [%s + %u], %s\n", dst_name, address, src_name);
+            }
+            else
+            {
+                fprintf(file, "mov [%s + %i], %s\n", dst_name, *((int16_t*)&address), src_name);
+            }
         }
     }
     else /* d == 1 */
     {
-        const char* src_name = r_m_to_addr_calc_name[r_m];
-        const char* dst_name = reg_to_register_name[w][reg];
+        const char* src_name = decoder_get_effective_address_from_rm(r_m);
+        const char* dst_name = decoder_get_reg_name_from_reg(w, reg);
         
         /* Print decoded instruction */
         if (address == 0x00)
         {
-            printf("mov %s, [%s]\n", dst_name, src_name);
+            fprintf(file, "mov %s, [%s]\n", dst_name, src_name);
         }
         else
         {
-            printf("mov %s, [%s + %u]\n", dst_name, src_name, address);
+            if (address_is_negative == false)
+            {
+                fprintf(file, "mov %s, [%s + %u]\n", dst_name, src_name, address);
+            }
+            else
+            {
+                fprintf(file, "mov %s, [%s + %i]\n", dst_name, src_name, *((int16_t*)&address));
+            }
         }
     }
 }
 
-static void mov_mod_11(const uint8_t* const inst_stream, const uint32_t inst_stream_len, uint32_t* const inst_stream_index, const uint8_t d, const uint8_t w, const uint8_t reg, const uint8_t r_m)
+static void mov_mod_11(const uint8_t* const inst_stream, const uint32_t inst_stream_len, uint32_t* const inst_stream_index, const uint8_t d, const uint8_t w, const uint8_t reg, const uint8_t r_m, FILE* file)
 {
     /* Determine what's source and destination */
     uint8_t src_index;
@@ -185,10 +211,10 @@ static void mov_mod_11(const uint8_t* const inst_stream, const uint32_t inst_str
     }
 
     /* Print decoded instruction */
-    printf("mov %s, %s\n", reg_to_register_name[w][dst_index], reg_to_register_name[w][src_index]);
+    fprintf(file, "mov %s, %s\n", decoder_get_reg_name_from_reg(w, dst_index), decoder_get_reg_name_from_reg(w, src_index));
 }
 
-static void decode_mov(const uint8_t* const inst_stream, const uint32_t inst_stream_len, uint32_t* const inst_stream_index)
+static void decode_mov(const uint8_t* const inst_stream, const uint32_t inst_stream_len, uint32_t* const inst_stream_index, FILE* file)
 {
     /* Get fields */
     const uint8_t d = (inst_stream[*inst_stream_index] & 0b10) >> 1;
@@ -204,29 +230,29 @@ static void decode_mov(const uint8_t* const inst_stream, const uint32_t inst_str
     {
         case 0b00:
         {
-            mov_mod_00(inst_stream, inst_stream_len, inst_stream_index, d, w, reg, r_m);
+            mov_mod_00(inst_stream, inst_stream_len, inst_stream_index, d, w, reg, r_m, file);
             break;
         }
         case 0b01:
         case 0b10:
         {
-            mov_mod_01_10(inst_stream, inst_stream_len, inst_stream_index, d, w, reg, r_m, mod);
+            mov_mod_01_10(inst_stream, inst_stream_len, inst_stream_index, d, w, reg, r_m, mod, file);
             break;
         }
         case 0b11:
         {
-            mov_mod_11(inst_stream, inst_stream_len, inst_stream_index, d, w, reg, r_m);
+            mov_mod_11(inst_stream, inst_stream_len, inst_stream_index, d, w, reg, r_m, file);
             break;
         }
         default:
         {
-            printf("[DECODE MOD] Unsupported MOD field (0x%02X)\n", mod);
+            fprintf(file, "[DECODE MOD] Unsupported MOD field (0x%02X)\n", mod);
             return;
         }
     }
 }
 
-static void decode_mov_imm_to_reg_or_mem(const uint8_t* const inst_stream, const uint32_t inst_stream_len, uint32_t* const inst_stream_index)
+static void decode_mov_imm_to_reg_or_mem(const uint8_t* const inst_stream, const uint32_t inst_stream_len, uint32_t* const inst_stream_index, FILE* file)
 {
     /* Get fields */
     const uint8_t w = inst_stream[*inst_stream_index] & 0b1;
@@ -259,34 +285,34 @@ static void decode_mov_imm_to_reg_or_mem(const uint8_t* const inst_stream, const
 
     /* Determine what's source and destination */
     const uint16_t src_name = imm;
-    const char* dst_name = r_m_to_addr_calc_name[r_m];
+    const char* dst_name = decoder_get_effective_address_from_rm(r_m);
 
     /* Print decoded instruction */
     if (address == 0x00)
     {
         if (w == 0)
         {
-            printf("mov [%s], byte %u\n", dst_name, src_name);
+            fprintf(file, "mov [%s], byte %u\n", dst_name, src_name);
         }
         else /* w == 1*/
         {
-            printf("mov [%s], word %u\n", dst_name, src_name);
+            fprintf(file, "mov [%s], word %u\n", dst_name, src_name);
         }
     }
     else
     {
         if (w == 0)
         {
-            printf("mov [%s + %u], byte %u\n", dst_name, address, src_name);
+            fprintf(file, "mov [%s + %u], byte %u\n", dst_name, address, src_name);
         }
         else /* w == 1*/
         {
-            printf("mov [%s + %u], word %u\n", dst_name, address, src_name);
+            fprintf(file, "mov [%s + %u], word %u\n", dst_name, address, src_name);
         }
     }
 }
 
-static void decode_mov_imm_to_reg(const uint8_t* const inst_stream, const uint32_t inst_stream_len, uint32_t* const inst_stream_index)
+static void decode_mov_imm_to_reg(const uint8_t* const inst_stream, const uint32_t inst_stream_len, uint32_t* const inst_stream_index, FILE* file)
 {
     /* Get fields */
     const uint8_t w = (inst_stream[*inst_stream_index] & 0b1000) >> 3;
@@ -304,10 +330,10 @@ static void decode_mov_imm_to_reg(const uint8_t* const inst_stream, const uint32
     }
 
     /* Print decoded instruction */
-    printf("mov %s, %u\n", reg_to_register_name[w][reg], ((uint16_t)data_high << 8) | (uint16_t)data_low);
+    fprintf(file, "mov %s, %u\n", decoder_get_reg_name_from_reg(w, reg), ((uint16_t)data_high << 8) | (uint16_t)data_low);
 }
 
-static void decode_mov_mem_to_acc(const uint8_t* const inst_stream, const uint32_t inst_stream_len, uint32_t* const inst_stream_index)
+static void decode_mov_mem_to_acc(const uint8_t* const inst_stream, const uint32_t inst_stream_len, uint32_t* const inst_stream_index, FILE* file)
 {
     /* Get fields */
     const uint8_t w = inst_stream[*inst_stream_index] & 0b1;
@@ -323,10 +349,10 @@ static void decode_mov_mem_to_acc(const uint8_t* const inst_stream, const uint32
     }
 
     /* Print decoded instruction */
-    printf("mov ax, [0x%04X]\n", address);
+    fprintf(file, "mov ax, [0x%04X]\n", address);
 }
 
-static void decode_mov_acc_to_mem(const uint8_t* const inst_stream, const uint32_t inst_stream_len, uint32_t* const inst_stream_index)
+static void decode_mov_acc_to_mem(const uint8_t* const inst_stream, const uint32_t inst_stream_len, uint32_t* const inst_stream_index, FILE* file)
 {
     /* Get fields */
     const uint8_t w = inst_stream[*inst_stream_index] & 0b1;
@@ -342,7 +368,7 @@ static void decode_mov_acc_to_mem(const uint8_t* const inst_stream, const uint32
     }
 
     /* Print decoded instruction */
-    printf("mov [0x%04X], ax\n", address);
+    fprintf(file, "mov [0x%04X], ax\n", address);
 }
 
 /**
@@ -389,7 +415,7 @@ static void decode_mov_acc_to_mem(const uint8_t* const inst_stream, const uint32
  *  - Bytes three through siz of an instruction are optional fields that usually contain the displacement value of a memory
  *    operand and/or the actual value of an immediate constant operand
 */
-void inst_decode(const uint8_t* const inst_stream, const uint32_t inst_stream_len)
+void decoder_decode_stream(const uint8_t* const inst_stream, const uint32_t inst_stream_len, FILE* output_file)
 {
     uint32_t index = 0;
     while (index < inst_stream_len)
@@ -398,28 +424,38 @@ void inst_decode(const uint8_t* const inst_stream, const uint32_t inst_stream_le
         const opcode_t opcode = inst_stream[index];
         if ((opcode & 0b11111100) == OPCODE_MOV)
         {
-            decode_mov(inst_stream, inst_stream_len, &index);
+            decode_mov(inst_stream, inst_stream_len, &index, output_file);
         }
         else if ((opcode & 0b11111110) == OPCODE_MOV_IMM_TO_REG_OR_MEM)
         {
-            decode_mov_imm_to_reg_or_mem(inst_stream, inst_stream_len, &index);
+            decode_mov_imm_to_reg_or_mem(inst_stream, inst_stream_len, &index, output_file);
         }
         else if ((opcode & 0b11110000) == OPCODE_MOV_IMM_TO_REG)
         {
-            decode_mov_imm_to_reg(inst_stream, inst_stream_len, &index);
+            decode_mov_imm_to_reg(inst_stream, inst_stream_len, &index, output_file);
         }
         else if ((opcode & 0b11111110) == OPCODE_MOV_MEM_TO_ACC)
         {
-            decode_mov_mem_to_acc(inst_stream, inst_stream_len, &index);
+            decode_mov_mem_to_acc(inst_stream, inst_stream_len, &index, output_file);
         }
         else if ((opcode & 0b11111110) == OPCODE_MOV_ACC_TO_MEM)
         {
-            decode_mov_acc_to_mem(inst_stream, inst_stream_len, &index);
+            decode_mov_acc_to_mem(inst_stream, inst_stream_len, &index, output_file);
         }
         else
         {
-            printf("[DECODE] Unknown opcode (0x%02X)\n", opcode);
+            fprintf(output_file, "[DECODE] Unknown opcode (0x%02X)\n", opcode);
             return;
         }
     }
+}
+
+const char* decoder_get_reg_name_from_reg(const uint8_t w, const uint8_t reg)
+{
+    return reg_to_reg_name[w][reg];
+}
+
+const char* decoder_get_effective_address_from_rm(const uint8_t rm)
+{
+    return r_m_to_addr_calc_name[rm];
 }
