@@ -103,6 +103,9 @@ int main(int argc, char** argv)
             return;
         }
         printf("\t[COMPARE] Original and result file are equal\n\n");
+
+        free(file_data_result);
+        free(file_data_original);
     }
 
     return 0;

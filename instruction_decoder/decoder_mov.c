@@ -27,10 +27,10 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include <stdbool.h>
 
-static void mov_mod_00(const uint8_t* const inst_stream, uint32_t* const inst_stream_index, const uint8_t d, const uint8_t w, const uint8_t reg, const uint8_t r_m, FILE* file)
+static void mov_mem_tofrom_reg_no_displacement(const uint8_t* const inst_stream, uint32_t* const inst_stream_index, const uint8_t d, const uint8_t w, const uint8_t reg, const uint8_t rm, FILE* file)
 {
     /* Handle direct address in displacement */
-    if (r_m == 0b110)
+    if (rm == 0b110)
     {
         /* Get 16-bit displacement */
         uint16_t addr = inst_stream[*inst_stream_index];
@@ -45,7 +45,7 @@ static void mov_mod_00(const uint8_t* const inst_stream, uint32_t* const inst_st
             const uint16_t dst_name = addr;
 
             /* Print decoded instruction */
-            fprintf(file, "mov [0x%04X], %s\n", dst_name, src_name);
+            fprintf(file, "mov [%u], %s\n", dst_name, src_name);
         }
         else /* d == 1 */
         {
@@ -53,7 +53,7 @@ static void mov_mod_00(const uint8_t* const inst_stream, uint32_t* const inst_st
             const char* dst_name = decoder_get_reg_name_from_reg(w, reg);
 
             /* Print decoded instruction */
-            fprintf(file, "mov %s, [0x%04X]\n", dst_name, src_name);
+            fprintf(file, "mov %s, [%u]\n", dst_name, src_name);
         }
 
         return;
@@ -63,14 +63,14 @@ static void mov_mod_00(const uint8_t* const inst_stream, uint32_t* const inst_st
     if (d == 0)
     {
         const char* src_name = decoder_get_reg_name_from_reg(w, reg);
-        const char* dst_name = decoder_get_effective_address_from_rm(r_m);
+        const char* dst_name = decoder_get_effective_address_from_rm(rm);
 
         /* Print decoded instruction */
         fprintf(file, "mov [%s], %s\n", dst_name, src_name);
     }
     else /* d == 1 */
     {
-        const char* src_name = decoder_get_effective_address_from_rm(r_m);
+        const char* src_name = decoder_get_effective_address_from_rm(rm);
         const char* dst_name = decoder_get_reg_name_from_reg(w, reg);
 
         /* Print decoded instruction */
@@ -78,7 +78,7 @@ static void mov_mod_00(const uint8_t* const inst_stream, uint32_t* const inst_st
     }
 }
 
-static void mov_mod_01_10(const uint8_t* const inst_stream, uint32_t* const inst_stream_index, const uint8_t d, const uint8_t w, const uint8_t reg, const uint8_t r_m, const uint8_t mod, FILE* file)
+static void mov_mem_tofrom_reg_with_displacement(const uint8_t* const inst_stream, uint32_t* const inst_stream_index, const uint8_t d, const uint8_t w, const uint8_t reg, const uint8_t rm, const uint8_t mod, FILE* file)
 {
     /* Get address */
     bool address_is_negative = false;
@@ -92,7 +92,7 @@ static void mov_mod_01_10(const uint8_t* const inst_stream, uint32_t* const inst
     else /* mod == 0b01 */
     {
         /* Check if address is negative, and if so sign-extend it to 16 bits*/
-        if ((address & 0x80) == 0x80)
+        if (address & 0x80)
         {
             address |= 0xFF00;
             address_is_negative = true;
@@ -103,7 +103,7 @@ static void mov_mod_01_10(const uint8_t* const inst_stream, uint32_t* const inst
     if (d == 0)
     {
         const char* src_name = decoder_get_reg_name_from_reg(w, reg);
-        const char* dst_name = decoder_get_effective_address_from_rm(r_m);
+        const char* dst_name = decoder_get_effective_address_from_rm(rm);
 
         /* Print decoded instruction */
         if (address == 0x00)
@@ -124,7 +124,7 @@ static void mov_mod_01_10(const uint8_t* const inst_stream, uint32_t* const inst
     }
     else /* d == 1 */
     {
-        const char* src_name = decoder_get_effective_address_from_rm(r_m);
+        const char* src_name = decoder_get_effective_address_from_rm(rm);
         const char* dst_name = decoder_get_reg_name_from_reg(w, reg);
         
         /* Print decoded instruction */
@@ -146,7 +146,10 @@ static void mov_mod_01_10(const uint8_t* const inst_stream, uint32_t* const inst
     }
 }
 
-static void mov_mod_11(const uint8_t* const inst_stream, uint32_t* const inst_stream_index, const uint8_t d, const uint8_t w, const uint8_t reg, const uint8_t r_m, FILE* file)
+/**
+ * @brief 
+*/
+static void mov_reg_tofrom_reg(const uint8_t* const inst_stream, uint32_t* const inst_stream_index, const uint8_t d, const uint8_t w, const uint8_t reg, const uint8_t rm, FILE* file)
 {
     /* Determine what's source and destination */
     uint8_t src_index;
@@ -154,11 +157,11 @@ static void mov_mod_11(const uint8_t* const inst_stream, uint32_t* const inst_st
     if (d == 0)
     {
         src_index = reg;
-        dst_index = r_m;
+        dst_index = rm;
     }
     else /* d == 1 */
     {
-        src_index = r_m;
+        src_index = rm;
         dst_index = reg;
     }
 
@@ -174,7 +177,7 @@ void decode_mov_regmem_tofrom_reg(const uint8_t* const inst_stream, uint32_t* co
     (*inst_stream_index)++;
     const uint8_t mod = (inst_stream[*inst_stream_index] & 0b11000000) >> 6;
     const uint8_t reg = (inst_stream[*inst_stream_index] & 0b00111000) >> 3;
-    const uint8_t r_m = inst_stream[*inst_stream_index] & 0b00000111;
+    const uint8_t rm = inst_stream[*inst_stream_index] & 0b00000111;
     (*inst_stream_index)++;
 
     /* Check fields */
@@ -182,18 +185,18 @@ void decode_mov_regmem_tofrom_reg(const uint8_t* const inst_stream, uint32_t* co
     {
         case 0b00:
         {
-            mov_mod_00(inst_stream, inst_stream_index, d, w, reg, r_m, file);
+            mov_mem_tofrom_reg_no_displacement(inst_stream, inst_stream_index, d, w, reg, rm, file);
             break;
         }
         case 0b01:
         case 0b10:
         {
-            mov_mod_01_10(inst_stream, inst_stream_index, d, w, reg, r_m, mod, file);
+            mov_mem_tofrom_reg_with_displacement(inst_stream, inst_stream_index, d, w, reg, rm, mod, file);
             break;
         }
         case 0b11:
         {
-            mov_mod_11(inst_stream, inst_stream_index, d, w, reg, r_m, file);
+            mov_reg_tofrom_reg(inst_stream, inst_stream_index, d, w, reg, rm, file);
             break;
         }
         default:
@@ -210,7 +213,7 @@ void decode_mov_imm_to_mem(const uint8_t* const inst_stream, uint32_t* const ins
     const uint8_t w = inst_stream[*inst_stream_index] & 0b1;
     (*inst_stream_index)++;
     const uint8_t mod = (inst_stream[*inst_stream_index] & 0b11000000) >> 6;
-    const uint8_t r_m = inst_stream[*inst_stream_index] & 0b111;
+    const uint8_t rm = inst_stream[*inst_stream_index] & 0b111;
     (*inst_stream_index)++;
 
     /* Get address */
@@ -237,7 +240,7 @@ void decode_mov_imm_to_mem(const uint8_t* const inst_stream, uint32_t* const ins
 
     /* Determine what's source and destination */
     const uint16_t src_name = imm;
-    const char* dst_name = decoder_get_effective_address_from_rm(r_m);
+    const char* dst_name = decoder_get_effective_address_from_rm(rm);
 
     /* Print decoded instruction */
     if (address == 0x00)
@@ -301,7 +304,7 @@ void decode_mov_mem_to_acc(const uint8_t* const inst_stream, uint32_t* const ins
     }
 
     /* Print decoded instruction */
-    fprintf(file, "mov ax, [0x%04X]\n", address);
+    fprintf(file, "mov ax, [%u]\n", address);
 }
 
 void decode_mov_acc_to_mem(const uint8_t* const inst_stream, uint32_t* const inst_stream_index, FILE* file)
@@ -320,5 +323,5 @@ void decode_mov_acc_to_mem(const uint8_t* const inst_stream, uint32_t* const ins
     }
 
     /* Print decoded instruction */
-    fprintf(file, "mov [0x%04X], ax\n", address);
+    fprintf(file, "mov [%u], ax\n", address);
 }
