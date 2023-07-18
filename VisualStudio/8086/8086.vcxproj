@@ -144,11 +144,13 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\instruction_decoder\decoder.c" />
+    <ClCompile Include="..\..\instruction_decoder\decoder_add.c" />
     <ClCompile Include="..\..\instruction_decoder\decoder_mov.c" />
     <ClCompile Include="..\..\main.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\instruction_decoder\decoder.h" />
+    <ClInclude Include="..\..\instruction_decoder\decoder_add.h" />
     <ClInclude Include="..\..\instruction_decoder\decoder_mov.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

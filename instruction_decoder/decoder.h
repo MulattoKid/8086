@@ -24,10 +24,12 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #ifndef DECODER_H
 #define DECODER_H
 
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 
 void decoder_decode_stream(const uint8_t* const inst_stream, const uint32_t inst_stream_len, FILE* output_file);
+void decoder_get_displacement(const uint8_t* const inst_stream, uint32_t* inst_stream_index, const bool is_16_bit, uint16_t* const displacement, bool* const displacement_is_negative);
 const char* decoder_get_reg_name_from_reg(const uint8_t w, const uint8_t reg);
 const char* decoder_get_effective_address_from_rm(const uint8_t rm);
 

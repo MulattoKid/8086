@@ -25,31 +25,28 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "decoder.h"
 
-#include <stdbool.h>
-
 static void mov_mem_tofrom_reg_no_displacement(const uint8_t* const inst_stream, uint32_t* const inst_stream_index, const uint8_t d, const uint8_t w, const uint8_t reg, const uint8_t rm, FILE* file)
 {
     /* Handle direct address in displacement */
     if (rm == 0b110)
     {
         /* Get 16-bit displacement */
-        uint16_t addr = inst_stream[*inst_stream_index];
-        (*inst_stream_index)++;
-        addr |= (uint16_t)inst_stream[*inst_stream_index] << 8;
-        (*inst_stream_index)++;
+        uint16_t displacement = 0;
+        bool _displacement_is_negative = false;
+        decoder_get_displacement(inst_stream, inst_stream_index, true, &displacement, &_displacement_is_negative);
 
         /* Determine what's source and destination */
         if (d == 0)
         {
             const char* src_name = decoder_get_reg_name_from_reg(w, reg);
-            const uint16_t dst_name = addr;
+            const uint16_t dst_name = displacement;
 
             /* Print decoded instruction */
             fprintf(file, "mov [%u], %s\n", dst_name, src_name);
         }
         else /* d == 1 */
         {
-            const uint16_t src_name = addr;
+            const uint16_t src_name = displacement;
             const char* dst_name = decoder_get_reg_name_from_reg(w, reg);
 
             /* Print decoded instruction */
@@ -80,24 +77,10 @@ static void mov_mem_tofrom_reg_no_displacement(const uint8_t* const inst_stream,
 
 static void mov_mem_tofrom_reg_with_displacement(const uint8_t* const inst_stream, uint32_t* const inst_stream_index, const uint8_t d, const uint8_t w, const uint8_t reg, const uint8_t rm, const uint8_t mod, FILE* file)
 {
-    /* Get address */
-    bool address_is_negative = false;
-    uint16_t address = (uint16_t)inst_stream[*inst_stream_index];
-    (*inst_stream_index)++;
-    if (mod == 0b10)
-    {
-        address |= ((uint16_t)inst_stream[*inst_stream_index]) << 8;
-        (*inst_stream_index)++;
-    }
-    else /* mod == 0b01 */
-    {
-        /* Check if address is negative, and if so sign-extend it to 16 bits*/
-        if (address & 0x80)
-        {
-            address |= 0xFF00;
-            address_is_negative = true;
-        }
-    }
+    /* Get displacement */
+    uint16_t displacement = 0;
+    bool displacement_is_negative = false;
+    decoder_get_displacement(inst_stream, inst_stream_index, mod == 0b10, &displacement, &displacement_is_negative);
 
     /* Determine what's source and destination */
     if (d == 0)
@@ -106,20 +89,13 @@ static void mov_mem_tofrom_reg_with_displacement(const uint8_t* const inst_strea
         const char* dst_name = decoder_get_effective_address_from_rm(rm);
 
         /* Print decoded instruction */
-        if (address == 0x00)
+        if (displacement_is_negative == false)
         {
-            fprintf(file, "mov [%s], %s\n", dst_name, src_name);
+            fprintf(file, "mov [%s + %u], %s\n", dst_name, displacement, src_name);
         }
-        else
+        else /* displacement_is_negative == true */
         {
-            if (address_is_negative == false)
-            {
-                fprintf(file, "mov [%s + %u], %s\n", dst_name, address, src_name);
-            }
-            else
-            {
-                fprintf(file, "mov [%s + %i], %s\n", dst_name, *((int16_t*)&address), src_name);
-            }
+            fprintf(file, "mov [%s %i], %s\n", dst_name, *((int16_t*)&displacement), src_name);
         }
     }
     else /* d == 1 */
@@ -128,27 +104,17 @@ static void mov_mem_tofrom_reg_with_displacement(const uint8_t* const inst_strea
         const char* dst_name = decoder_get_reg_name_from_reg(w, reg);
         
         /* Print decoded instruction */
-        if (address == 0x00)
+        if (displacement_is_negative == false)
         {
-            fprintf(file, "mov %s, [%s]\n", dst_name, src_name);
+            fprintf(file, "mov %s, [%s + %u]\n", dst_name, src_name, displacement);
         }
-        else
+        else /* displacement_is_negative == true */
         {
-            if (address_is_negative == false)
-            {
-                fprintf(file, "mov %s, [%s + %u]\n", dst_name, src_name, address);
-            }
-            else
-            {
-                fprintf(file, "mov %s, [%s + %i]\n", dst_name, src_name, *((int16_t*)&address));
-            }
+            fprintf(file, "mov %s, [%s %i]\n", dst_name, src_name, *((int16_t*)&displacement));
         }
     }
 }
 
-/**
- * @brief 
-*/
 static void mov_reg_tofrom_reg(const uint8_t* const inst_stream, uint32_t* const inst_stream_index, const uint8_t d, const uint8_t w, const uint8_t reg, const uint8_t rm, FILE* file)
 {
     /* Determine what's source and destination */
@@ -216,17 +182,12 @@ void decode_mov_imm_to_mem(const uint8_t* const inst_stream, uint32_t* const ins
     const uint8_t rm = inst_stream[*inst_stream_index] & 0b111;
     (*inst_stream_index)++;
 
-    /* Get address */
-    uint16_t address = 0;
+    /* Get displacement */
+    uint16_t displacement = 0;
+    bool _displacement_is_negative = false;
     if (mod != 0b00)
     {
-        address = (uint16_t)inst_stream[*inst_stream_index];
-        (*inst_stream_index)++;
-    }
-    if (mod == 0b10)
-    {
-        address |= ((uint16_t)inst_stream[*inst_stream_index]) << 8;
-        (*inst_stream_index)++;
+        decoder_get_displacement(inst_stream, inst_stream_index, mod == 0b10, &displacement, &_displacement_is_negative);
     }
 
     /* Get immediate value */
@@ -243,27 +204,13 @@ void decode_mov_imm_to_mem(const uint8_t* const inst_stream, uint32_t* const ins
     const char* dst_name = decoder_get_effective_address_from_rm(rm);
 
     /* Print decoded instruction */
-    if (address == 0x00)
+    if (w == 0)
     {
-        if (w == 0)
-        {
-            fprintf(file, "mov [%s], byte %u\n", dst_name, src_name);
-        }
-        else /* w == 1*/
-        {
-            fprintf(file, "mov [%s], word %u\n", dst_name, src_name);
-        }
+        fprintf(file, "mov [%s + %u], byte %u\n", dst_name, displacement, src_name);
     }
-    else
+    else /* w == 1*/
     {
-        if (w == 0)
-        {
-            fprintf(file, "mov [%s + %u], byte %u\n", dst_name, address, src_name);
-        }
-        else /* w == 1*/
-        {
-            fprintf(file, "mov [%s + %u], word %u\n", dst_name, address, src_name);
-        }
+        fprintf(file, "mov [%s + %u], word %u\n", dst_name, displacement, src_name);
     }
 }
 

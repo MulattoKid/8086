@@ -23,15 +23,20 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "decoder.h"
 
+#include "decoder_add.h"
 #include "decoder_mov.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 
 #define REGISTER_COUNT (uint8_t)8U
 #define ADDRESS_CALC_COUNT (uint8_t)8U
 
 typedef enum
 {
+    OPCODE_ADD                   = 0b00000000,
+    OPCODE_ADD_IMM_TO_REG_OR_MEM = 0b10000000,
+    OPCODE_ADD_IMM_TO_ACC        = 0b00000100,
     OPCODE_MOV                   = 0b10001000,
     OPCODE_MOV_IMM_TO_REG_OR_MEM = 0b11000110,
     OPCODE_MOV_IMM_TO_REG        = 0b10110000,
@@ -121,12 +126,26 @@ static const char* r_m_to_addr_calc_name[ADDRESS_CALC_COUNT] = {
 */
 void decoder_decode_stream(const uint8_t* const inst_stream, const uint32_t inst_stream_len, FILE* output_file)
 {
+    fprintf(output_file, "bits 16\n\n");
+
     uint32_t index = 0;
     while (index < inst_stream_len)
     {
         /* Determine OPCODE */
         const opcode_t opcode = inst_stream[index];
-        if ((opcode & 0b11111100) == OPCODE_MOV)
+        if ((opcode & 0b11111100) == OPCODE_ADD)
+        {
+            decode_add_regmem_reg(inst_stream, &index, output_file);
+        }
+        else if ((opcode & 0b11111100) == OPCODE_ADD_IMM_TO_REG_OR_MEM)
+        {
+            decode_add_imm_to_regmem(inst_stream, &index, output_file);
+        }
+        else if ((opcode & 0b11111110) == OPCODE_ADD_IMM_TO_ACC)
+        {
+            decode_add_imm_to_acc(inst_stream, &index, output_file);
+        }
+        else if ((opcode & 0b11111100) == OPCODE_MOV)
         {
             decode_mov_regmem_tofrom_reg(inst_stream, &index, output_file);
         }
@@ -149,7 +168,29 @@ void decoder_decode_stream(const uint8_t* const inst_stream, const uint32_t inst
         else
         {
             fprintf(output_file, "[DECODE] Unknown opcode (0x%02X)\n", opcode);
-            return;
+            break;
+        }
+
+        fflush(output_file);
+    }
+}
+
+void decoder_get_displacement(const uint8_t* const inst_stream, uint32_t* inst_stream_index, const bool is_16_bit, uint16_t* const displacement, bool* const displacement_is_negative)
+{
+    *displacement = inst_stream[*inst_stream_index];
+    (*inst_stream_index)++;
+    if (is_16_bit == true)
+    {
+        *displacement |= (uint16_t)inst_stream[*inst_stream_index] << 8;
+        (*inst_stream_index)++;
+    }
+    else /* is_16_bit == false */
+    {
+        // Sign-extend if negative
+        if (*displacement & 0x80)
+        {
+            *displacement |= 0xFF00;
+            *displacement_is_negative = true;
         }
     }
 }

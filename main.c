@@ -34,7 +34,9 @@ static const char* encoded_assembly_files[ENCODED_ASSEMBLY_FILE_COUNT] = {
     "./test_files/listing_0037_single_register_mov",
     "./test_files/listing_0038_many_register_mov",
     "./test_files/listing_0039_more_movs",
-    "./test_files/listing_0039_more_movs",
+    "./test_files/listing_0040_challenge_movs",
+    // "./test_files/listing_0041_add_sub_cmp_jnz",
+    // "./test_files/listing_0042_completionist_decode",
 };
 
 int main(int argc, char** argv)
@@ -71,7 +73,6 @@ int main(int argc, char** argv)
         decoder_decode_stream(file_data_original, file_size_original, file);
 
         /* Close file */
-        fflush(file);
         fclose(file);
 
         /* Encode output assembly file */

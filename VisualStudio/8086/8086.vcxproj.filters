@@ -13,12 +13,18 @@
     <ClCompile Include="..\..\instruction_decoder\decoder_mov.c">
       <Filter>instruction_decoder</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\instruction_decoder\decoder_add.c">
+      <Filter>instruction_decoder</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\instruction_decoder\decoder.h">
       <Filter>instruction_decoder</Filter>
     </ClInclude>
     <ClInclude Include="..\..\instruction_decoder\decoder_mov.h">
+      <Filter>instruction_decoder</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\instruction_decoder\decoder_add.h">
       <Filter>instruction_decoder</Filter>
     </ClInclude>
   </ItemGroup>
