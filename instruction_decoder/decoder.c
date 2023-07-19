@@ -177,6 +177,7 @@ void decoder_decode_stream(const uint8_t* const inst_stream, const uint32_t inst
 
 void decoder_get_displacement(const uint8_t* const inst_stream, uint32_t* inst_stream_index, const bool is_16_bit, uint16_t* const displacement, bool* const displacement_is_negative)
 {
+    *displacement_is_negative = false;
     *displacement = inst_stream[*inst_stream_index];
     (*inst_stream_index)++;
     if (is_16_bit == true)
@@ -195,12 +196,30 @@ void decoder_get_displacement(const uint8_t* const inst_stream, uint32_t* inst_s
     }
 }
 
-const char* decoder_get_reg_name_from_reg(const uint8_t w, const uint8_t reg)
+void decoder_get_immediate(const uint8_t* const inst_stream, uint32_t* inst_stream_index, const uint8_t s, const uint8_t w, uint16_t* const immediate, bool* const immediate_is_negative)
+{
+    *immediate_is_negative = false;
+    *immediate = inst_stream[*inst_stream_index];
+    (*inst_stream_index)++;
+    /* 16-bit value */
+    if ((s == 0) && (w == 1))
+    {
+        *immediate |= (uint16_t)inst_stream[*inst_stream_index] << 8;
+        (*inst_stream_index)++;
+    }
+    else if ((s == 1) && (w == 1) && (*immediate & 0x80)) /* Sign-extend if negative */
+    {
+        *immediate |= 0xFF00;
+        *immediate_is_negative = true;
+    }
+}
+
+const char* decoder_get_reg_name(const uint8_t w, const uint8_t reg)
 {
     return reg_to_reg_name[w][reg];
 }
 
-const char* decoder_get_effective_address_from_rm(const uint8_t rm)
+const char* decoder_get_effective_address(const uint8_t rm)
 {
     return r_m_to_addr_calc_name[rm];
 }

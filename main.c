@@ -28,21 +28,20 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <stdlib.h>
 #include <string.h>
 
-#define ENCODED_ASSEMBLY_FILE_COUNT 4
-
-static const char* encoded_assembly_files[ENCODED_ASSEMBLY_FILE_COUNT] = {
-    "./test_files/listing_0037_single_register_mov",
-    "./test_files/listing_0038_many_register_mov",
-    "./test_files/listing_0039_more_movs",
-    "./test_files/listing_0040_challenge_movs",
-    // "./test_files/listing_0041_add_sub_cmp_jnz",
+static const char* encoded_assembly_files[] = {
+    // "./test_files/listing_0037_single_register_mov",
+    // "./test_files/listing_0038_many_register_mov",
+    // "./test_files/listing_0039_more_movs",
+    // "./test_files/listing_0040_challenge_movs",
+    "./test_files/listing_0041_add_sub_cmp_jnz",
     // "./test_files/listing_0042_completionist_decode",
 };
 
 int main(int argc, char** argv)
 {
     /* Decode all files */
-    for (uint8_t i = 0; i < ENCODED_ASSEMBLY_FILE_COUNT; i++)
+    const uint8_t encoded_assembly_file_count = sizeof(encoded_assembly_files) / sizeof(char*);
+    for (uint8_t i = 0; i < encoded_assembly_file_count; i++)
     {
         /* Print current file */
         printf("Decoding '%s'\n", encoded_assembly_files[i]);

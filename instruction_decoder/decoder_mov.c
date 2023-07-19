@@ -38,7 +38,7 @@ static void mov_mem_tofrom_reg_no_displacement(const uint8_t* const inst_stream,
         /* Determine what's source and destination */
         if (d == 0)
         {
-            const char* src_name = decoder_get_reg_name_from_reg(w, reg);
+            const char* src_name = decoder_get_reg_name(w, reg);
             const uint16_t dst_name = displacement;
 
             /* Print decoded instruction */
@@ -47,7 +47,7 @@ static void mov_mem_tofrom_reg_no_displacement(const uint8_t* const inst_stream,
         else /* d == 1 */
         {
             const uint16_t src_name = displacement;
-            const char* dst_name = decoder_get_reg_name_from_reg(w, reg);
+            const char* dst_name = decoder_get_reg_name(w, reg);
 
             /* Print decoded instruction */
             fprintf(file, "mov %s, [%u]\n", dst_name, src_name);
@@ -59,16 +59,16 @@ static void mov_mem_tofrom_reg_no_displacement(const uint8_t* const inst_stream,
     /* Determine what's source and destination */
     if (d == 0)
     {
-        const char* src_name = decoder_get_reg_name_from_reg(w, reg);
-        const char* dst_name = decoder_get_effective_address_from_rm(rm);
+        const char* src_name = decoder_get_reg_name(w, reg);
+        const char* dst_name = decoder_get_effective_address(rm);
 
         /* Print decoded instruction */
         fprintf(file, "mov [%s], %s\n", dst_name, src_name);
     }
     else /* d == 1 */
     {
-        const char* src_name = decoder_get_effective_address_from_rm(rm);
-        const char* dst_name = decoder_get_reg_name_from_reg(w, reg);
+        const char* src_name = decoder_get_effective_address(rm);
+        const char* dst_name = decoder_get_reg_name(w, reg);
 
         /* Print decoded instruction */
         fprintf(file, "mov %s, [%s]\n", dst_name, src_name);
@@ -85,8 +85,8 @@ static void mov_mem_tofrom_reg_with_displacement(const uint8_t* const inst_strea
     /* Determine what's source and destination */
     if (d == 0)
     {
-        const char* src_name = decoder_get_reg_name_from_reg(w, reg);
-        const char* dst_name = decoder_get_effective_address_from_rm(rm);
+        const char* src_name = decoder_get_reg_name(w, reg);
+        const char* dst_name = decoder_get_effective_address(rm);
 
         /* Print decoded instruction */
         if (displacement_is_negative == false)
@@ -100,8 +100,8 @@ static void mov_mem_tofrom_reg_with_displacement(const uint8_t* const inst_strea
     }
     else /* d == 1 */
     {
-        const char* src_name = decoder_get_effective_address_from_rm(rm);
-        const char* dst_name = decoder_get_reg_name_from_reg(w, reg);
+        const char* src_name = decoder_get_effective_address(rm);
+        const char* dst_name = decoder_get_reg_name(w, reg);
         
         /* Print decoded instruction */
         if (displacement_is_negative == false)
@@ -113,7 +113,7 @@ static void mov_mem_tofrom_reg_with_displacement(const uint8_t* const inst_strea
             fprintf(file, "mov %s, [%s %i]\n", dst_name, src_name, *((int16_t*)&displacement));
         }
     }
-}
+    }
 
 static void mov_reg_tofrom_reg(const uint8_t* const inst_stream, uint32_t* const inst_stream_index, const uint8_t d, const uint8_t w, const uint8_t reg, const uint8_t rm, FILE* file)
 {
@@ -132,7 +132,7 @@ static void mov_reg_tofrom_reg(const uint8_t* const inst_stream, uint32_t* const
     }
 
     /* Print decoded instruction */
-    fprintf(file, "mov %s, %s\n", decoder_get_reg_name_from_reg(w, dst_index), decoder_get_reg_name_from_reg(w, src_index));
+    fprintf(file, "mov %s, %s\n", decoder_get_reg_name(w, dst_index), decoder_get_reg_name(w, src_index));
 }
 
 void decode_mov_regmem_tofrom_reg(const uint8_t* const inst_stream, uint32_t* const inst_stream_index, FILE* file)
@@ -201,7 +201,7 @@ void decode_mov_imm_to_mem(const uint8_t* const inst_stream, uint32_t* const ins
 
     /* Determine what's source and destination */
     const uint16_t src_name = imm;
-    const char* dst_name = decoder_get_effective_address_from_rm(rm);
+    const char* dst_name = decoder_get_effective_address(rm);
 
     /* Print decoded instruction */
     if (w == 0)
@@ -232,7 +232,7 @@ void decode_mov_imm_to_reg(const uint8_t* const inst_stream, uint32_t* const ins
     }
 
     /* Print decoded instruction */
-    fprintf(file, "mov %s, %u\n", decoder_get_reg_name_from_reg(w, reg), ((uint16_t)data_high << 8) | (uint16_t)data_low);
+    fprintf(file, "mov %s, %u\n", decoder_get_reg_name(w, reg), ((uint16_t)data_high << 8) | (uint16_t)data_low);
 }
 
 void decode_mov_mem_to_acc(const uint8_t* const inst_stream, uint32_t* const inst_stream_index, FILE* file)
